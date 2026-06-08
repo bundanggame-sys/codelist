@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>세콤 카드분출 관리대장</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; }
+    /* 스크롤바 커스텀 디자인 (선택사항) */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 w-full h-full min-h-screen overflow-hidden">
+
+  <div id="pc-view" class="hidden flex-col h-screen w-full">
+    
+    <header class="bg-indigo-900 text-white shadow-md px-8 py-4 flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-3">
+        <div class="bg-indigo-500 p-2 rounded-lg text-white font-bold text-xl">💳</div>
+        <h1 class="text-xl font-bold tracking-wide">세콤 카드분출 관리대장 <span class="text-xs text-indigo-300 ml-2">초고속 PC 뷰</span></h1>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div id="pc-status-badge" class="text-sm bg-indigo-800 px-4 py-1.5 rounded-full text-indigo-200">
+          통신 대기중...
+        </div>
+        <button onclick="switchViewMode('mobile')" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1.5 rounded-lg text-sm text-white transition-colors flex items-center shadow-sm">
+          📱 스마트폰 뷰로 전환
+        </button>
+      </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+      <aside class="w-96 bg-white border-r border-slate-200 p-6 shadow-sm overflow-y-auto shrink-0">
+        <div class="border-b border-slate-100 pb-4 mb-6">
+          <h2 class="text-lg font-bold text-slate-900">신규 분출 등록</h2>
+          <p class="text-xs text-slate-500 mt-1">대여자의 인적사항을 입력하고 카드를 선택하세요.</p>
+        </div>
+
+        <form id="pcForm" onsubmit="submitData(event, 'pc')" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">이름</label>
+            <input type="text" id="pc-name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">소속</label>
+            <input type="text" id="pc-department" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">전화번호</label>
+            <input type="tel" id="pc-phone" placeholder="010-0000-0000" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">카드번호 선택</label>
+            <select id="pc-cardNumber" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white cursor-pointer">
+              <option value="" disabled selected>카드를 선택해주세요</option>
+              <option value="예비1">예비1</option>
+              <option value="예비2">예비2</option>
+              <option value="예비3">예비3</option>
+              <option value="예비4">예비4</option>
+              <option value="예비5">예비5</option>
+            </select>
+          </div>
+          <button type="submit" id="pc-submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg text-sm shadow-sm mt-2 transition-colors">
+            분출 데이터 등록
+          </button>
+        </form>
+      </aside>
+
+      <main class="flex-1 p-8 overflow-y-auto flex flex-col bg-slate-50">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row items-center justify-between shrink-0">
+          <div class="relative w-full md:w-96 mb-3 md:mb-0">
+            <input type="text" id="pc-search" oninput="filterData()" placeholder="이름, 소속, 카드번호 검색..." class="w-full pl-3 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div class="flex space-x-2">
+            <select id="pc-statusFilter" onchange="filterData()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="전체">전체 상태</option>
+              <option value="대기">대기</option>
+              <option value="분출완료">분출완료</option>
+              <option value="반납완료">반납완료</option>
+            </select>
+            <button onclick="fetchData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center">
+              🔄 새로고침
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1">
+          <div class="overflow-x-auto h-full">
+            <table class="w-full text-left border-collapse relative">
+              <thead class="sticky top-0 bg-slate-50 z-10">
+                <tr class="border-b border-slate-200 text-slate-600 text-xs font-semibold uppercase tracking-wider">
+                  <th class="px-6 py-4">이름</th>
+                  <th class="px-6 py-4">소속</th>
+                  <th class="px-6 py-4">전화번호</th>
+                  <th class="px-6 py-4">카드번호</th>
+                  <th class="px-6 py-4">분출일</th>
+                  <th class="px-6 py-4">반납일</th>
+                  <th class="px-6 py-4 text-center">확인 (상태)</th>
+                  <th class="px-6 py-4 text-center">작업</th>
+                </tr>
+              </thead>
+              <tbody id="pc-tableBody" class="divide-y divide-slate-100 text-sm">
+                </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+
+  <div id="mobile-view" class="hidden flex-col min-h-screen bg-slate-100 w-full overflow-x-hidden relative">
+    
+    <header class="bg-indigo-900 text-white shadow-sm px-4 py-3 sticky top-0 z-10 flex justify-between items-center shrink-0">
+      <div class="flex items-center space-x-2">
+        <span class="text-lg">💳</span>
+        <h1 class="text-base font-bold tracking-tight">세콤 관리 <span class="text-xs text-indigo-300 font-normal">초고속 Mobile</span></h1>
+      </div>
+      <div class="flex space-x-2">
+        <button onclick="switchViewMode('pc')" class="text-xs bg-indigo-700 px-2.5 py-1.5 rounded-md text-white active:bg-indigo-600 shadow-sm flex items-center">
+          💻 PC 뷰
+        </button>
+        <button onclick="fetchData()" class="text-xs bg-indigo-800 px-2.5 py-1.5 rounded-md text-indigo-200 active:bg-indigo-700 flex items-center">
+          🔄
+        </button>
+      </div>
+    </header>
+
+    <div class="p-3 bg-white border-b border-slate-200 shadow-sm space-y-2 sticky top-[52px] z-10 shrink-0">
+      <input type="text" id="m-search" oninput="filterData()" placeholder="이름, 소속, 카드번호 검색..." class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <div class="flex space-x-2">
+        <button onclick="setMobileFilter('전체', this)" class="m-filter-btn flex-1 py-1 text-xs font-medium rounded-md bg-indigo-600 text-white border border-indigo-600">전체</button>
+        <button onclick="setMobileFilter('분출완료', this)" class="m-filter-btn flex-1 py-1 text-xs font-medium rounded-md bg-white text-slate-600 border border-slate-200">분출완료</button>
+        <button onclick="setMobileFilter('반납완료', this)" class="m-filter-btn flex-1 py-1 text-xs font-medium rounded-md bg-white text-slate-600 border border-slate-200">반납완료</button>
+      </div>
+    </div>
+
+    <main class="flex-1 p-3 space-y-3 overflow-y-auto" id="m-cardContainer">
+      </main>
+
+    <button onclick="toggleMobileModal(true)" class="fixed bottom-6 right-6 bg-indigo-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center font-bold text-2xl z-20 active:scale-95 transition-transform">
+      ＋
+    </button>
+
+    <div id="m-registerModal" class="fixed inset-0 bg-slate-900/60 hidden items-end justify-center z-30 transition-opacity">
+      <div class="bg-white w-full rounded-t-2xl max-h-[85vh] overflow-y-auto p-6 space-y-4 shadow-xl">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+          <h3 class="text-base font-bold text-slate-900">신규 카드 분출 신청</h3>
+          <button onclick="toggleMobileModal(false)" class="text-slate-400 p-1 text-xl font-semibold hover:text-slate-700">&times;</button>
+        </div>
+
+        <form id="mobileForm" onsubmit="submitData(event, 'mobile')" class="space-y-3 text-sm">
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">이름</label>
+            <input type="text" id="m-name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">소속</label>
+            <input type="text" id="m-department" required class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">전화번호</label>
+            <input type="tel" id="m-phone" placeholder="010-0000-0000" required class="w-full px-3 py-2 border border-slate-300 rounded-lg">
+          </div>
+          <div>
+            <label class="block font-medium text-slate-700 mb-1">카드번호 선택</label>
+            <select id="m-cardNumber" required class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white appearance-none">
+              <option value="" disabled selected>카드를 선택해주세요</option>
+              <option value="예비1">예비1</option>
+              <option value="예비2">예비2</option>
+              <option value="예비3">예비3</option>
+              <option value="예비4">예비4</option>
+              <option value="예비5">예비5</option>
+            </select>
+          </div>
+          <div class="flex space-x-2 pt-2">
+            <button type="button" onclick="toggleMobileModal(false)" class="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium">취소</button>
+            <button type="submit" id="m-submitBtn" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium">분출 등록</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // [주의] 방금 구글 앱스 스크립트에서 배포하고 얻은 웹앱 URL을 아래 따옴표 안에 반드시 붙여넣으세요!
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzznhDOIy8Mcm-ktfOac3z_XgWsSYbp3k5ImE2hHYhQCjsI69Rx-gaTQCiRqYqnMLRI/exec'; 
+
+    // 서버에서 가져온 원본 데이터를 보관하는 메모리 공간입니다.
+    let globalRecords = [];
+    let currentMobileFilter = '전체';
+
+    /**
+     * [초기화 로직]
+     * 화면이 로딩되면 접속 기기의 가로 길이를 판별하여 적절한 화면(PC/모바일)을 즉시 띄우고 데이터를 요청합니다.
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      const isMobile = window.innerWidth < 768;
+      switchViewMode(isMobile ? 'mobile' : 'pc');
+      fetchData(); // 직통 전화선(Fetch)을 통해 구글 서버에 데이터를 요청합니다.
+    });
+
+    /**
+     * [SPA 화면 전환 마법]
+     * 버튼을 누르면 브라우저의 깜빡임이나 서버 연결 없이, HTML 태그의 숨김/표시만 변경하여 0초 만에 화면을 바꿉니다.
+     */
+    function switchViewMode(mode) {
+      const pcView = document.getElementById('pc-view');
+      const mobileView = document.getElementById('mobile-view');
+      
+      if (mode === 'pc') {
+        pcView.classList.remove('hidden');
+        pcView.classList.add('flex');
+        mobileView.classList.remove('flex');
+        mobileView.classList.add('hidden');
+      } else {
+        mobileView.classList.remove('hidden');
+        mobileView.classList.add('flex');
+        pcView.classList.remove('flex');
+        pcView.classList.add('hidden');
+      }
+    }
+
+    /**
+     * [데이터 조회 - GET 통신]
+     * 구글 API 서버(Code.gs)에 접근하여 JSON 데이터를 팩스로 받아오는 초고속 비동기 함수입니다.
+     */
+    async function fetchData() {
+      // 로딩 상태를 양쪽 화면에 모두 표시합니다.
+      document.getElementById('pc-tableBody').innerHTML = '<tr><td colspan="8" class="text-center py-12 text-slate-500">🔄 데이터를 불러오는 중...</td></tr>';
+      document.getElementById('m-cardContainer').innerHTML = '<div class="text-center py-12 text-slate-500">🔄 데이터를 불러오는 중...</div>';
+      updatePcStatusBadge("통신 중...");
+
+      try {
+        // fetch API를 사용해 구글 서버의 doGet 함수를 깨웁니다.
+        const response = await fetch(SCRIPT_URL);
+        if (!response.ok) throw new Error("서버 응답 오류");
+        
+        // 받아온 편지(JSON)를 해독합니다.
+        const result = await response.json();
+        
+        if (result.success) {
+          globalRecords = result.data; // 데이터를 로컬 창고에 보관합니다.
+          updatePcStatusBadge("동기화 완료");
+          filterData(); // 보관된 데이터를 바탕으로 PC와 모바일 화면을 동시에 예쁘게 그립니다.
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (error) {
+        // 서버 연결이 끊기거나 에러가 났을 때 시스템이 뻗지 않도록 방어(Catch)합니다.
+        document.getElementById('pc-tableBody').innerHTML = `<tr><td colspan="8" class="text-center py-12 text-red-500">❌ 조회 실패: ${error.message}</td></tr>`;
+        document.getElementById('m-cardContainer').innerHTML = `<div class="text-center py-12 text-red-500">❌ 조회 실패: ${error.message}</div>`;
+        updatePcStatusBadge("통신 실패");
+      }
+    }
+
+    /**
+     * [데이터 저장/수정 - POST 통신]
+     * 구글 API 서버(Code.gs)에 새로운 정보를 적어달라고 요청을 보내는 범용 함수입니다.
+     * CORS 보안 에러를 피하기 위해 method: 'POST'와 body(문자열 포장)를 정밀하게 세팅했습니다.
+     */
+    async function sendDataToServer(payloadObj, btnElem, originalBtnText) {
+      btnElem.disabled = true;
+      btnElem.innerText = '서버 통신 중...';
+
+      try {
+        const response = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          // 중요: headers에 Content-Type을 지정하지 않거나 text/plain으로 보내야 CORS 충돌을 방지할 수 있습니다.
+          body: JSON.stringify(payloadObj)
+        });
+        
+        const result = await response.json();
+        
+        btnElem.disabled = false;
+        btnElem.innerText = originalBtnText;
+
+        if (result.success) {
+          return true; // 성공 시 true 반환
+        } else {
+          alert('처리 실패: ' + result.message);
+          return false;
+        }
+      } catch (error) {
+        btnElem.disabled = false;
+        btnElem.innerText = originalBtnText;
+        alert('네트워크 오류: ' + error.message);
+        return false;
+      }
+    }
+
+    /**
+     * PC 또는 모바일의 '등록' 버튼을 눌렀을 때 폼 안의 데이터를 수집하여 서버로 던지는 함수입니다.
+     */
+    async function submitData(event, origin) {
+      event.preventDefault(); // 새로고침 방지
+      
+      // 어떤 화면(PC/모바일)에서 요청했는지에 따라 아이디(ID)를 다르게 수집합니다.
+      const prefix = origin === 'pc' ? 'pc-' : 'm-';
+      const btn = document.getElementById(`${prefix}submitBtn`);
+      
+      const payloadData = {
+        name: document.getElementById(`${prefix}name`).value.trim(),
+        department: document.getElementById(`${prefix}department`).value.trim(),
+        phone: document.getElementById(`${prefix}phone`).value.trim(),
+        cardNumber: document.getElementById(`${prefix}cardNumber`).value
+      };
+
+      // action: "create" 꼬리표를 달아서 Code.gs의 doPost 함수가 신규 등록임을 알게 합니다.
+      const requestObject = { action: "create", payload: payloadData };
+      
+      // 서버로 데이터를 쏩니다.
+      const isSuccess = await sendDataToServer(requestObject, btn, '분출 데이터 등록');
+      
+      // 성공적으로 기록되었다면 입력창을 비우고 데이터를 새로고침합니다.
+      if (isSuccess) {
+        document.getElementById(origin === 'pc' ? 'pcForm' : 'mobileForm').reset();
+        if (origin === 'mobile') toggleMobileModal(false);
+        fetchData();
+      }
+    }
+
+    /**
+     * 양쪽 화면에서 '반납' 버튼을 눌렀을 때 실행되는 함수입니다.
+     */
+    async function processReturn(rowNumber, btnElem) {
+      if (!confirm('카드가 정상 반납되었음을 확인하셨습니까?')) return;
+      
+      const originalText = btnElem.innerText;
+      // action: "update" 꼬리표와 행 번호(rowNumber)를 보내서 Code.gs가 수정을 진행하게 합니다.
+      const requestObject = { action: "update", rowNumber: rowNumber };
+      
+      const isSuccess = await sendDataToServer(requestObject, btnElem, originalText);
+      if (isSuccess) {
+        fetchData(); // 상태가 '반납완료'로 바뀌었으므로 화면 갱신
+      }
+    }
+
+    /**
+     * 사용자가 검색어나 필터(대기/분출완료/반납완료)를 조작할 때, 조건에 맞는 데이터만 걸러서 화면을 그립니다.
+     */
+    function filterData() {
+      // 1. PC 필터링 및 렌더링
+      const pcSearch = document.getElementById('pc-search').value.toLowerCase();
+      const pcStatus = document.getElementById('pc-statusFilter').value;
+      const pcFiltered = globalRecords.filter(item => {
+        const matchSearch = item.name.toLowerCase().includes(pcSearch) || item.department.toLowerCase().includes(pcSearch) || item.cardNumber.toLowerCase().includes(pcSearch);
+        const matchStatus = (pcStatus === '전체') || (item.status === pcStatus);
+        return matchSearch && matchStatus;
+      });
+      renderPcTable(pcFiltered);
+
+      // 2. 모바일 필터링 및 렌더링
+      const mSearch = document.getElementById('m-search').value.toLowerCase();
+      const mFiltered = globalRecords.filter(item => {
+        const matchSearch = item.name.toLowerCase().includes(mSearch) || item.department.toLowerCase().includes(mSearch) || item.cardNumber.toLowerCase().includes(mSearch);
+        const matchStatus = (currentMobileFilter === '전체') || (item.status === currentMobileFilter);
+        return matchSearch && matchStatus;
+      });
+      renderMobileCards(mFiltered);
+    }
+
+    // 모바일 전용 상태 필터 버튼 UI 조작
+    function setMobileFilter(status, elem) {
+      currentMobileFilter = status;
+      document.querySelectorAll('.m-filter-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+        btn.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+      });
+      elem.classList.remove('bg-white', 'text-slate-600', 'border-slate-200');
+      elem.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+      filterData();
+    }
+
+    // 모바일 전용 신규 등록 모달창 토글 스위치
+    function toggleMobileModal(show) {
+      const modal = document.getElementById('m-registerModal');
+      if (show) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      } else {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+      }
+    }
+
+    function updatePcStatusBadge(text) {
+      document.getElementById('pc-status-badge').innerText = text;
+    }
+
+    /**
+     * [화면 조립 공장 1] 가공된 데이터를 받아 PC 화면의 넓은 표(Table)로 찍어냅니다.
+     */
+    function renderPcTable(records) {
+      const tbody = document.getElementById('pc-tableBody');
+      if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-12 text-slate-400">데이터가 존재하지 않습니다.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      records.forEach(item => {
+        let badgeColor = 'bg-slate-100 text-slate-600 border-slate-200';
+        if (item.status === '분출완료') badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
+        else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+        const showReturnBtn = item.status === '분출완료';
+
+        html += `
+          <tr class="hover:bg-slate-50 transition-colors">
+            <td class="px-6 py-4 font-medium text-slate-900">${escapeHtml(item.name)}</td>
+            <td class="px-6 py-4 text-slate-600">${escapeHtml(item.department)}</td>
+            <td class="px-6 py-4 text-slate-600">${escapeHtml(item.phone)}</td>
+            <td class="px-6 py-4 font-mono font-semibold text-indigo-700">${escapeHtml(item.cardNumber)}</td>
+            <td class="px-6 py-4 text-xs text-slate-500">${item.disburseDate}</td>
+            <td class="px-6 py-4 text-xs text-slate-500">${item.returnDate}</td>
+            <td class="px-6 py-4 text-center">
+              <span class="px-2.5 py-1 text-xs font-semibold rounded-full border ${badgeColor}">${item.status}</span>
+            </td>
+            <td class="px-6 py-4 text-center">
+              ${showReturnBtn 
+                ? `<button onclick="processReturn(${item.rowNumber}, this)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-medium px-3 py-1 rounded-md transition-colors whitespace-nowrap">반납 확인</button>` 
+                : `<span class="text-xs text-slate-400">처리완료</span>`
+              }
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    /**
+     * [화면 조립 공장 2] 가공된 데이터를 받아 모바일 화면의 카드(Card) 형태로 찍어냅니다.
+     */
+    function renderMobileCards(records) {
+      const container = document.getElementById('m-cardContainer');
+      if (records.length === 0) {
+        container.innerHTML = '<div class="text-center py-12 text-slate-400 text-sm">데이터가 존재하지 않습니다.</div>';
+        return;
+      }
+
+      let html = '';
+      records.forEach(item => {
+        let badgeColor = 'bg-slate-100 text-slate-600';
+        if (item.status === '분출완료') badgeColor = 'bg-amber-100 text-amber-800';
+        else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800';
+        
+        const showReturnBtn = item.status === '분출완료';
+        
+        html += `
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col space-y-2.5">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-slate-900 text-base">${escapeHtml(item.name)}</span>
+                <span class="text-xs text-slate-400">| ${escapeHtml(item.department)}</span>
+              </div>
+              <span class="px-2 py-0.5 text-xs font-semibold rounded-full ${badgeColor}">${item.status}</span>
+            </div>
+            
+            <div class="text-xs space-y-1 text-slate-600">
+              <div class="flex justify-between">
+                <span>📞 전화번호:</span>
+                <a href="tel:${item.phone}" class="text-indigo-600 font-medium underline">${escapeHtml(item.phone)}</a>
+              </div>
+              <div class="flex justify-between">
+                <span>💳 카드번호:</span>
+                <span class="font-mono font-semibold text-indigo-700">${escapeHtml(item.cardNumber)}</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>🛫 분출일시:</span>
+                <span>${item.disburseDate}</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>🛬 반납일시:</span>
+                <span>${item.returnDate}</span>
+              </div>
+            </div>
+
+            ${showReturnBtn 
+              ? `<button onclick="processReturn(${item.rowNumber}, this)" class="w-full mt-1 bg-slate-50 hover:bg-indigo-50 text-indigo-600 border border-slate-200 font-medium py-2 rounded-lg text-xs">반납 확인 처리</button>`
+              : ''
+            }
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    /**
+     * [보안 유틸리티] 해커가 게시판에 스크립트 코드를 넣어서 공격하는 XSS 공격을 막아주는 보호막 함수입니다.
+     */
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+  </script>
+</body>
+</html>
