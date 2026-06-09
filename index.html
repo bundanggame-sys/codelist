@@ -21,7 +21,7 @@
       <div class="text-center mb-6">
         <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🔐</div>
         <h2 class="text-xl font-bold text-slate-900">관리자 인증</h2>
-        <p class="text-sm text-slate-500 mt-1">반납 처리를 위해 로그인하세요.</p>
+        <p class="text-sm text-slate-500 mt-1">반납 및 삭제 처리를 위해 로그인하세요.</p>
       </div>
       <form onsubmit="processLogin(event)" class="space-y-4">
         <div>
@@ -130,7 +130,7 @@
                   <th class="px-6 py-4">대여일</th>
                   <th class="px-6 py-4">반납일</th>
                   <th class="px-6 py-4 text-center">확인 (상태)</th>
-                  <th class="px-6 py-4 text-center">작업</th>
+                  <th class="px-6 py-4 text-center">작업 관리</th>
                 </tr>
               </thead>
               <tbody id="pc-tableBody" class="divide-y divide-slate-100 text-sm">
@@ -222,7 +222,7 @@
   </div>
 
   <script>
-    // [설정 영역] 반드시 아래 값들을 채워주세요.
+    // [설정 영역] 반드시 앱스 스크립트 웹앱 주소로 변경하세요!
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzznhDOIy8Mcm-ktfOac3z_XgWsSYbp3k5ImE2hHYhQCjsI69Rx-gaTQCiRqYqnMLRI/exec'; 
     const ADMIN_ID = 'admin';
     const ADMIN_PW = 'SBSqnsekd11!';
@@ -249,7 +249,7 @@
         document.getElementById('loginPw').value = '';
         toggleLoginModal(false);
         updateAdminUI();
-        alert('관리자로 로그인되었습니다. 반납 확인 기능이 활성화됩니다.');
+        alert('관리자로 로그인되었습니다. 반납 및 삭제 기능이 활성화됩니다.');
       } else {
         alert('아이디 또는 비밀번호가 올바르지 않습니다.');
       }
@@ -262,10 +262,6 @@
       }
     }
 
-    /**
-     * 로그인 상태에 따라 '로그인 버튼'과 '반납 버튼'의 가시성만 조절합니다. 
-     * 대여 폼은 항상 보여집니다.
-     */
     function updateAdminUI() {
       const pcAuthContainer = document.getElementById('pc-auth-container');
       if (isAdminLoggedIn) {
@@ -320,15 +316,15 @@
           throw new Error(result.message);
         }
       } catch (error) {
-        document.getElementById('pc-tableBody').innerHTML = `<tr><td colspan="8" class="text-center py-12 text-red-500 font-medium">❌ 조회 실패: 구글 앱스 스크립트 URL 또는 배포 권한을 확인해주세요.</td></tr>`;
-        document.getElementById('m-cardContainer').innerHTML = `<div class="text-center py-12 text-red-500 font-medium">❌ 조회 실패: 배포 권한 확인 요망</div>`;
+        document.getElementById('pc-tableBody').innerHTML = `<tr><td colspan="8" class="text-center py-12 text-red-500 font-medium">❌ 조회 실패: 구글 앱스 스크립트 URL을 확인해주세요.</td></tr>`;
+        document.getElementById('m-cardContainer').innerHTML = `<div class="text-center py-12 text-red-500 font-medium">❌ 조회 실패</div>`;
         updatePcStatusBadge("통신 실패");
       }
     }
 
     async function sendDataToServer(payloadObj, btnElem, originalBtnText) {
       btnElem.disabled = true;
-      btnElem.innerText = '서버 통신 중...';
+      btnElem.innerText = '통신 중...';
 
       try {
         const response = await fetch(SCRIPT_URL, {
@@ -345,12 +341,12 @@
         else { alert('처리 실패: ' + result.message); return false; }
       } catch (error) {
         btnElem.disabled = false; btnElem.innerText = originalBtnText;
-        alert('네트워크 오류 (CORS 또는 URL 확인): ' + error.message);
+        alert('네트워크 오류: ' + error.message);
         return false;
       }
     }
 
-    // 신규 대여 신청 로직 (관리자 권한 체크 삭제됨 -> 누구나 가능)
+    // 신규 대여 신청
     async function submitData(event, origin) {
       event.preventDefault();
 
@@ -375,14 +371,25 @@
       }
     }
 
-    // 반납 처리 로직 (관리자 권한 필수)
+    // 반납 처리
     async function processReturn(rowNumber, btnElem) {
-      if (!isAdminLoggedIn) { alert("반납 확인은 관리자 로그인 후 이용 가능합니다."); return; }
       if (!confirm('카드가 정상 반납되었음을 확인하셨습니까?')) return;
-      
       const requestObject = { action: "update", rowNumber: rowNumber };
-      const isSuccess = await sendDataToServer(requestObject, btnElem, btnElem.innerText);
+      const isSuccess = await sendDataToServer(requestObject, btnElem, "반납 확인");
       if (isSuccess) fetchData();
+    }
+
+    // 삭제 처리 (새롭게 추가된 마법의 지우개 기능)
+    async function deleteData(rowNumber, btnElem) {
+      if (!confirm('정말로 이 기록을 삭제하시겠습니까?\n한 번 삭제하면 절대 복구할 수 없습니다!')) return;
+      
+      const requestObject = { action: "delete", rowNumber: rowNumber };
+      const isSuccess = await sendDataToServer(requestObject, btnElem, "삭제중");
+      
+      if (isSuccess) {
+        alert('데이터가 성공적으로 삭제되었습니다.');
+        fetchData(); // 삭제 후 위로 당겨진 장부 인덱스를 프론트엔드에 다시 강제 동기화합니다.
+      }
     }
 
     function filterData() {
@@ -423,7 +430,7 @@
 
     function updatePcStatusBadge(text) { document.getElementById('pc-status-badge').innerText = text; }
 
-    // PC 뷰 렌더링 공장
+    // PC 뷰 테이블 렌더링
     function renderPcTable(records) {
       const tbody = document.getElementById('pc-tableBody');
       if (records.length === 0) {
@@ -435,15 +442,16 @@
         if (item.status === '대여완료') badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
         else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
 
-        let actionColumnHtml = `<span class="text-xs text-slate-400">조회 전용</span>`;
+        // 관리자용 액션 버튼 렌더링 (반납 및 삭제 버튼 생성)
+        let actionColumnHtml = `<span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded border border-slate-200">조회 모드</span>`;
         if (isAdminLoggedIn) {
+          let buttons = '';
           if (item.status === '대여완료') {
-            actionColumnHtml = `<button onclick="processReturn(${item.rowNumber}, this)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-medium px-3 py-1 rounded-md transition-colors whitespace-nowrap">반납 확인</button>`;
-          } else {
-            actionColumnHtml = `<span class="text-xs text-slate-400">처리완료</span>`;
+            buttons += `<button onclick="processReturn(${item.rowNumber}, this)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm mr-2">반납 확인</button>`;
           }
-        } else if (item.status === '대여완료') {
-           actionColumnHtml = `<span class="text-xs text-slate-400 border border-slate-200 px-2 py-1 rounded bg-slate-50">대여중</span>`;
+          // 삭제 버튼은 상태(대여/반납)와 상관없이 항상 노출됩니다.
+          buttons += `<button onclick="deleteData(${item.rowNumber}, this)" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm">기록 삭제</button>`;
+          actionColumnHtml = `<div class="flex justify-center items-center">${buttons}</div>`;
         }
 
         html += `
@@ -462,7 +470,7 @@
       tbody.innerHTML = html;
     }
 
-    // 모바일 뷰 렌더링 공장
+    // 모바일 뷰 카드 렌더링
     function renderMobileCards(records) {
       const container = document.getElementById('m-cardContainer');
       if (records.length === 0) {
@@ -474,9 +482,18 @@
         if (item.status === '대여완료') badgeColor = 'bg-amber-100 text-amber-800';
         else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800';
         
-        let returnBtnHtml = '';
-        if (isAdminLoggedIn && item.status === '대여완료') {
-          returnBtnHtml = `<button onclick="processReturn(${item.rowNumber}, this)" class="w-full mt-2 bg-slate-50 hover:bg-indigo-50 text-indigo-600 border border-slate-200 font-medium py-2.5 rounded-lg text-sm shadow-sm transition-colors">반납 확인 처리</button>`;
+        // 관리자용 액션 버튼 렌더링 (가로로 버튼 배치)
+        let adminActionHtml = '';
+        if (isAdminLoggedIn) {
+          let returnBtn = item.status === '대여완료' ? `<button onclick="processReturn(${item.rowNumber}, this)" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium py-2 rounded-lg text-sm shadow-sm transition-colors">반납 확인</button>` : '';
+          let deleteBtn = `<button onclick="deleteData(${item.rowNumber}, this)" class="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium py-2 rounded-lg text-sm shadow-sm transition-colors">기록 삭제</button>`;
+          
+          adminActionHtml = `
+            <div class="flex space-x-2 mt-3 pt-3 border-t border-slate-100">
+              ${returnBtn}
+              ${deleteBtn}
+            </div>
+          `;
         }
         
         html += `
@@ -495,7 +512,7 @@
               <div class="flex justify-between text-slate-400"><span>🛫 대여일시:</span><span>${item.rentDate}</span></div>
               <div class="flex justify-between text-slate-400"><span>🛬 반납일시:</span><span>${item.returnDate}</span></div>
             </div>
-            ${returnBtnHtml}
+            ${adminActionHtml}
           </div>
         `;
       });
