@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>세콤 카드 대여 관리대장</title>
+  <title>세콤 카드 대여 관리대장 (보안/인사 통합 뷰)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -16,12 +16,12 @@
 </head>
 <body class="bg-slate-50 text-slate-800 w-full h-full min-h-screen overflow-hidden">
 
-  <div id="loginModal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-50 transition-opacity">
+  <div id="loginModal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-[60] transition-opacity">
     <div class="bg-white w-11/12 max-w-sm rounded-2xl p-8 shadow-2xl">
       <div class="text-center mb-6">
         <div class="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🔐</div>
         <h2 class="text-xl font-bold text-slate-900">관리자 인증</h2>
-        <p class="text-sm text-slate-500 mt-1">반납 및 삭제 처리를 위해 로그인하세요.</p>
+        <p class="text-sm text-slate-500 mt-1">계정 정보를 입력해주세요.</p>
       </div>
       <form onsubmit="processLogin(event)" class="space-y-4">
         <div>
@@ -34,11 +34,40 @@
         </div>
         <div class="flex space-x-3 pt-4">
           <button type="button" onclick="toggleLoginModal(false)" class="flex-1 bg-slate-100 text-slate-700 font-medium py-3 rounded-xl hover:bg-slate-200 transition">취소</button>
-          <button type="submit" class="flex-1 bg-indigo-600 text-white font-medium py-3 rounded-xl hover:bg-indigo-700 transition shadow-md">로그인</button>
+          <button type="submit" id="loginSubmitBtn" class="flex-1 bg-indigo-600 text-white font-medium py-3 rounded-xl hover:bg-indigo-700 transition shadow-md">로그인</button>
         </div>
       </form>
     </div>
   </div>
+
+  <div id="adminManageModal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-[60] transition-opacity">
+    <div class="bg-white w-11/12 max-w-lg rounded-2xl p-6 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-4 shrink-0">
+        <div class="flex items-center space-x-2">
+          <span class="text-2xl">⚙️</span>
+          <h2 class="text-lg font-bold text-slate-900">하위 관리자 계정 관리</h2>
+        </div>
+        <button onclick="toggleAdminManageModal(false)" class="text-slate-400 hover:text-slate-700 text-xl font-semibold">&times;</button>
+      </div>
+
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 shrink-0">
+        <h3 class="text-sm font-bold text-slate-700 mb-3">새 계정 만들기</h3>
+        <form onsubmit="processCreateAdmin(event)" class="flex space-x-2">
+          <input type="text" id="newAdminId" placeholder="새 아이디" required class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <input type="password" id="newAdminPw" placeholder="새 비밀번호" required class="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <button type="submit" id="createAdminBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap">추가</button>
+        </form>
+      </div>
+
+      <div class="flex-1 overflow-y-auto">
+        <h3 class="text-sm font-bold text-slate-700 mb-2">등록된 하위 관리자 목록</h3>
+        <ul id="adminListContainer" class="space-y-2">
+          <li class="text-center text-slate-400 text-sm py-4">목록을 불러오는 중...</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
 
   <div id="pc-view" class="hidden flex-col h-screen w-full">
     <header class="bg-indigo-900 text-white shadow-md px-8 py-4 flex justify-between items-center shrink-0 z-20">
@@ -49,11 +78,12 @@
       <div class="flex items-center space-x-4">
         <div id="pc-status-badge" class="text-sm bg-indigo-800 px-4 py-1.5 rounded-full text-indigo-200">통신 대기중...</div>
         
-        <div id="pc-auth-container">
+        <div id="pc-auth-container" class="flex space-x-2">
           <button onclick="toggleLoginModal(true)" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors shadow-sm">
             🔐 관리자 로그인
           </button>
         </div>
+
         <button onclick="switchViewMode('mobile')" class="bg-indigo-700 hover:bg-indigo-600 px-3 py-1.5 rounded-lg text-sm text-white transition-colors flex items-center shadow-sm">
           📱 스마트폰 뷰로 전환
         </button>
@@ -144,14 +174,13 @@
 
 
   <div id="mobile-view" class="hidden flex-col min-h-screen bg-slate-100 w-full overflow-x-hidden relative">
-    
     <header class="bg-indigo-900 text-white shadow-sm px-4 py-3 sticky top-0 z-20 flex justify-between items-center shrink-0">
       <div class="flex items-center space-x-2">
         <span class="text-lg">💳</span>
         <h1 class="text-base font-bold tracking-tight">세콤 대여 <span class="text-xs text-indigo-300 font-normal">Mobile</span></h1>
       </div>
       <div class="flex space-x-2">
-        <div id="m-auth-container" class="flex items-center">
+        <div id="m-auth-container" class="flex items-center space-x-1">
           <button onclick="toggleLoginModal(true)" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">
             🔐 관리자
           </button>
@@ -222,15 +251,18 @@
   </div>
 
   <script>
-    // [설정 영역] 반드시 앱스 스크립트 웹앱 주소로 변경하세요!
+    // [가장 중요!] 구글 앱스 스크립트를 [새 버전]으로 배포한 웹앱 URL을 붙여넣으세요.
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzznhDOIy8Mcm-ktfOac3z_XgWsSYbp3k5ImE2hHYhQCjsI69Rx-gaTQCiRqYqnMLRI/exec'; 
-    const ADMIN_ID = 'admin';
-    const ADMIN_PW = 'SBSqnsekd11!';
 
+    // 상태 관리 변수: 이제 비밀번호 하드코딩이 없고, 권한을 3단계로 관리합니다.
     let globalRecords = [];
+    let adminRecords = []; // 하위 관리자 목록을 담을 변수
     let currentMobileFilter = '전체';
-    let isAdminLoggedIn = false;
+    let currentUserRole = 'guest'; // 'guest', 'sub', 'master' 중 하나를 가집니다.
 
+    /**
+     * [초기화] 이 함수가 처음 켜지면 화면 크기를 판별하고 서버에서 데이터를 가져옵니다.
+     */
     window.addEventListener('DOMContentLoaded', () => {
       const isMobile = window.innerWidth < 768;
       switchViewMode(isMobile ? 'mobile' : 'pc');
@@ -238,50 +270,194 @@
       fetchData(); 
     });
 
-    function processLogin(event) {
+    /**
+     * [통신 모듈] 구글 서버와 문자열(텍스트)로 통신하여 CORS 에러를 회피하는 만능 팩스입니다.
+     */
+    async function sendDataToServer(payloadObj, btnElem, originalBtnText) {
+      if(btnElem) { btnElem.disabled = true; btnElem.innerText = '통신 중...'; }
+      try {
+        const response = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payloadObj)
+        });
+        const result = await response.json();
+        if(btnElem) { btnElem.disabled = false; btnElem.innerText = originalBtnText; }
+
+        if (result.success) return result;
+        else { alert('서버 처리 실패: ' + result.message); return null; }
+      } catch (error) {
+        if(btnElem) { btnElem.disabled = false; btnElem.innerText = originalBtnText; }
+        alert('네트워크 오류: ' + error.message);
+        return null;
+      }
+    }
+
+    /**
+     * [로그인 프로세스] 입력된 아이디/비밀번호를 서버로 보내서 권한(Role)을 판별받습니다.
+     */
+    async function processLogin(event) {
       event.preventDefault();
       const idInput = document.getElementById('loginId').value.trim();
       const pwInput = document.getElementById('loginPw').value.trim();
+      const btn = document.getElementById('loginSubmitBtn');
 
-      if (idInput === ADMIN_ID && pwInput === ADMIN_PW) {
-        isAdminLoggedIn = true;
+      const requestObject = { action: "login", id: idInput, pw: pwInput };
+      
+      // 서버에 로그인 검증을 요청합니다.
+      const response = await sendDataToServer(requestObject, btn, '로그인');
+      
+      if (response && response.success) {
+        currentUserRole = response.role; // 서버가 알려준 권한('master' 또는 'sub')을 부여받습니다.
         document.getElementById('loginId').value = '';
         document.getElementById('loginPw').value = '';
         toggleLoginModal(false);
-        updateAdminUI();
-        alert('관리자로 로그인되었습니다. 반납 및 삭제 기능이 활성화됩니다.');
-      } else {
-        alert('아이디 또는 비밀번호가 올바르지 않습니다.');
+        updateAdminUI(); // 권한에 맞춰 화면의 버튼들을 새로 그립니다.
+        
+        let msg = currentUserRole === 'master' ? '최고 관리자(Master)로 로그인되었습니다. 계정 관리 기능이 활성화됩니다.' : '일반 관리자(Sub)로 로그인되었습니다. 반납/삭제 기능이 활성화됩니다.';
+        alert(msg);
       }
     }
 
+    /**
+     * [로그아웃 프로세스] 권한을 다시 손님(guest)으로 강등시킵니다.
+     */
     function processLogout() {
       if(confirm('로그아웃 하시겠습니까?')){
-        isAdminLoggedIn = false;
+        currentUserRole = 'guest';
         updateAdminUI();
       }
     }
 
+    /**
+     * [UI 통제 마법사] 현재 부여받은 권한(currentUserRole)에 따라 메뉴 버튼을 바꿉니다.
+     */
     function updateAdminUI() {
       const pcAuthContainer = document.getElementById('pc-auth-container');
-      if (isAdminLoggedIn) {
-        pcAuthContainer.innerHTML = `<button onclick="processLogout()" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔓 로그아웃</button>`;
-      } else {
-        pcAuthContainer.innerHTML = `<button onclick="toggleLoginModal(true)" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔐 관리자 로그인</button>`;
-      }
-
       const mAuthContainer = document.getElementById('m-auth-container');
-      if (isAdminLoggedIn) {
-        mAuthContainer.innerHTML = `<button onclick="processLogout()" class="text-xs bg-rose-600 hover:bg-rose-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔓 로그아웃</button>`;
+      
+      let pcButtons = '';
+      let mButtons = '';
+
+      if (currentUserRole === 'master') {
+        // 최고 관리자는 '계정 관리' 톱니바퀴 버튼이 추가로 보입니다!
+        pcButtons = `
+          <button onclick="openAdminManageModal()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm flex items-center">⚙️ 인사 관리</button>
+          <button onclick="processLogout()" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔓 로그아웃</button>
+        `;
+        mButtons = `
+          <button onclick="openAdminManageModal()" class="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1.5 rounded-md text-white font-medium shadow-sm">⚙️ 관리</button>
+          <button onclick="processLogout()" class="text-xs bg-rose-600 hover:bg-rose-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔓 아웃</button>
+        `;
+      } else if (currentUserRole === 'sub') {
+        // 하위 관리자는 로그아웃 버튼만 보입니다.
+        pcButtons = `<button onclick="processLogout()" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔓 로그아웃</button>`;
+        mButtons = `<button onclick="processLogout()" class="text-xs bg-rose-600 hover:bg-rose-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔓 로그아웃</button>`;
       } else {
-        mAuthContainer.innerHTML = `<button onclick="toggleLoginModal(true)" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔐 관리자</button>`;
+        // 손님은 로그인 버튼만 보입니다.
+        pcButtons = `<button onclick="toggleLoginModal(true)" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔐 관리자 로그인</button>`;
+        mButtons = `<button onclick="toggleLoginModal(true)" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔐 로그인</button>`;
       }
 
-      filterData(); 
+      pcAuthContainer.innerHTML = pcButtons;
+      mAuthContainer.innerHTML = mButtons;
+      
+      filterData(); // 표와 카드에 있는 반납/삭제 버튼도 권한에 맞춰 다시 그립니다.
     }
 
+    /**
+     * [최고 관리자 전용] 하위 관리자 목록을 서버에서 가져옵니다.
+     */
+    async function fetchAdminData() {
+      const container = document.getElementById('adminListContainer');
+      container.innerHTML = '<li class="text-center text-slate-400 text-sm py-4">목록을 불러오는 중...</li>';
+      
+      try {
+        const response = await fetch(SCRIPT_URL + '?action=getAdmins', { redirect: "follow" });
+        const result = await response.json();
+        if (result.success) {
+          adminRecords = result.data;
+          renderAdminList(); // 목록 그리기
+        }
+      } catch (error) {
+        container.innerHTML = `<li class="text-center text-red-500 text-sm py-4">조회 실패</li>`;
+      }
+    }
+
+    /**
+     * [최고 관리자 전용] 하위 관리자 목록을 모달창 화면에 그려줍니다.
+     */
+    function renderAdminList() {
+      const container = document.getElementById('adminListContainer');
+      if (adminRecords.length === 0) {
+        container.innerHTML = '<li class="text-center text-slate-400 text-sm py-4 bg-slate-50 rounded-lg">등록된 하위 관리자가 없습니다.</li>';
+        return;
+      }
+      
+      let html = '';
+      adminRecords.forEach(admin => {
+        html += `
+          <li class="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+            <div>
+              <p class="font-bold text-slate-800 text-sm">ID: ${escapeHtml(admin.id)}</p>
+              <p class="text-xs text-slate-400">PW: ${escapeHtml(admin.pw)} | 생성일: ${admin.createDate}</p>
+            </div>
+            <button onclick="processDeleteAdmin('${escapeHtml(admin.id)}', this)" class="bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 px-3 py-1 rounded text-xs font-medium transition-colors">삭제</button>
+          </li>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    /**
+     * [최고 관리자 전용] 하위 관리자 계정을 생성해 달라고 서버에 요청합니다.
+     */
+    async function processCreateAdmin(event) {
+      event.preventDefault();
+      const idInput = document.getElementById('newAdminId').value.trim();
+      const pwInput = document.getElementById('newAdminPw').value.trim();
+      const btn = document.getElementById('createAdminBtn');
+
+      const requestObject = { action: "createAdmin", payload: { id: idInput, pw: pwInput } };
+      const response = await sendDataToServer(requestObject, btn, '추가');
+      
+      if (response && response.success) {
+        document.getElementById('newAdminId').value = '';
+        document.getElementById('newAdminPw').value = '';
+        alert('계정이 생성되었습니다.');
+        fetchAdminData(); // 생성 후 목록 새로고침
+      }
+    }
+
+    /**
+     * [최고 관리자 전용] 특정 하위 관리자 계정을 지워달라고 서버에 요청합니다.
+     */
+    async function processDeleteAdmin(targetId, btnElem) {
+      if (!confirm(`'${targetId}' 관리자 계정을 정말 삭제하시겠습니까?`)) return;
+      
+      const requestObject = { action: "deleteAdmin", targetId: targetId };
+      const response = await sendDataToServer(requestObject, btnElem, '삭제중');
+      
+      if (response && response.success) {
+        fetchAdminData(); // 삭제 후 목록 새로고침
+      }
+    }
+
+    // 모달 제어 유틸리티
     function toggleLoginModal(show) {
       const modal = document.getElementById('loginModal');
+      if (show) { modal.classList.remove('hidden'); modal.classList.add('flex'); } 
+      else { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    }
+
+    function openAdminManageModal() {
+      toggleAdminManageModal(true);
+      fetchAdminData(); // 창을 열 때마다 최신 인사 명부를 가져옵니다.
+    }
+
+    function toggleAdminManageModal(show) {
+      const modal = document.getElementById('adminManageModal');
       if (show) { modal.classList.remove('hidden'); modal.classList.add('flex'); } 
       else { modal.classList.add('hidden'); modal.classList.remove('flex'); }
     }
@@ -298,6 +474,9 @@
       }
     }
 
+    /**
+     * 장부 대장을 구글 시트에서 가져옵니다. (GET 방식)
+     */
     async function fetchData() {
       document.getElementById('pc-tableBody').innerHTML = '<tr><td colspan="8" class="text-center py-12 text-slate-500">🔄 데이터를 불러오는 중...</td></tr>';
       document.getElementById('m-cardContainer').innerHTML = '<div class="text-center py-12 text-slate-500">🔄 데이터를 불러오는 중...</div>';
@@ -322,31 +501,7 @@
       }
     }
 
-    async function sendDataToServer(payloadObj, btnElem, originalBtnText) {
-      btnElem.disabled = true;
-      btnElem.innerText = '통신 중...';
-
-      try {
-        const response = await fetch(SCRIPT_URL, {
-          method: 'POST',
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payloadObj)
-        });
-        
-        const result = await response.json();
-        btnElem.disabled = false; btnElem.innerText = originalBtnText;
-
-        if (result.success) return true;
-        else { alert('처리 실패: ' + result.message); return false; }
-      } catch (error) {
-        btnElem.disabled = false; btnElem.innerText = originalBtnText;
-        alert('네트워크 오류: ' + error.message);
-        return false;
-      }
-    }
-
-    // 신규 대여 신청
+    // 누구나 할 수 있는 대여 신청
     async function submitData(event, origin) {
       event.preventDefault();
 
@@ -361,37 +516,40 @@
       };
 
       const requestObject = { action: "create", payload: payloadData };
-      const isSuccess = await sendDataToServer(requestObject, btn, '카드 대여 신청');
+      const response = await sendDataToServer(requestObject, btn, '카드 대여 신청');
       
-      if (isSuccess) {
+      if (response && response.success) {
         document.getElementById(origin === 'pc' ? 'pcForm' : 'mobileForm').reset();
-        if (origin === 'mobile') toggleMobileModal(false);
-        fetchData();
+        if (origin === 'mobile') toggleMobileModal(false); // 모바일은 등록 후 창을 닫아줍니다.
+        fetchData(); // 장부를 새롭게 갱신합니다.
         alert('성공적으로 대여 신청이 완료되었습니다!');
       }
     }
 
-    // 반납 처리
+    // 반납 처리 (sub, master 권한 모두 가능)
     async function processReturn(rowNumber, btnElem) {
+      if (currentUserRole === 'guest') { alert("권한이 없습니다."); return; }
       if (!confirm('카드가 정상 반납되었음을 확인하셨습니까?')) return;
+      
       const requestObject = { action: "update", rowNumber: rowNumber };
-      const isSuccess = await sendDataToServer(requestObject, btnElem, "반납 확인");
-      if (isSuccess) fetchData();
+      const response = await sendDataToServer(requestObject, btnElem, "반납 확인");
+      if (response && response.success) fetchData();
     }
 
-    // 삭제 처리 (새롭게 추가된 마법의 지우개 기능)
+    // 기록 삭제 (sub, master 권한 모두 가능)
     async function deleteData(rowNumber, btnElem) {
-      if (!confirm('정말로 이 기록을 삭제하시겠습니까?\n한 번 삭제하면 절대 복구할 수 없습니다!')) return;
+      if (currentUserRole === 'guest') { alert("권한이 없습니다."); return; }
+      if (!confirm('정말로 이 기록을 삭제하시겠습니까?\n복구할 수 없습니다!')) return;
       
       const requestObject = { action: "delete", rowNumber: rowNumber };
-      const isSuccess = await sendDataToServer(requestObject, btnElem, "삭제중");
+      const response = await sendDataToServer(requestObject, btnElem, "삭제중");
       
-      if (isSuccess) {
-        alert('데이터가 성공적으로 삭제되었습니다.');
-        fetchData(); // 삭제 후 위로 당겨진 장부 인덱스를 프론트엔드에 다시 강제 동기화합니다.
+      if (response && response.success) {
+        fetchData();
       }
     }
 
+    // 필터 데이터 매칭 함수
     function filterData() {
       const pcSearch = document.getElementById('pc-search').value.toLowerCase();
       const pcStatus = document.getElementById('pc-statusFilter').value;
@@ -430,7 +588,9 @@
 
     function updatePcStatusBadge(text) { document.getElementById('pc-status-badge').innerText = text; }
 
-    // PC 뷰 테이블 렌더링
+    /**
+     * [PC 뷰 렌더링] 이 함수가 호출될 때마다 권한(currentUserRole)을 검사하여 작업(Action) 버튼을 다르게 그립니다.
+     */
     function renderPcTable(records) {
       const tbody = document.getElementById('pc-tableBody');
       if (records.length === 0) {
@@ -442,14 +602,14 @@
         if (item.status === '대여완료') badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
         else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
 
-        // 관리자용 액션 버튼 렌더링 (반납 및 삭제 버튼 생성)
-        let actionColumnHtml = `<span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded border border-slate-200">조회 모드</span>`;
-        if (isAdminLoggedIn) {
+        let actionColumnHtml = `<span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded border border-slate-200">조회 전용</span>`;
+        
+        // 손님(guest)이 아닐 때, 즉 서브관리자이거나 마스터일 때 버튼 활성화
+        if (currentUserRole !== 'guest') {
           let buttons = '';
           if (item.status === '대여완료') {
             buttons += `<button onclick="processReturn(${item.rowNumber}, this)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm mr-2">반납 확인</button>`;
           }
-          // 삭제 버튼은 상태(대여/반납)와 상관없이 항상 노출됩니다.
           buttons += `<button onclick="deleteData(${item.rowNumber}, this)" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm">기록 삭제</button>`;
           actionColumnHtml = `<div class="flex justify-center items-center">${buttons}</div>`;
         }
@@ -470,7 +630,9 @@
       tbody.innerHTML = html;
     }
 
-    // 모바일 뷰 카드 렌더링
+    /**
+     * [모바일 뷰 렌더링] 모바일에서도 동일한 권한 방어 로직이 작동합니다.
+     */
     function renderMobileCards(records) {
       const container = document.getElementById('m-cardContainer');
       if (records.length === 0) {
@@ -482,9 +644,8 @@
         if (item.status === '대여완료') badgeColor = 'bg-amber-100 text-amber-800';
         else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800';
         
-        // 관리자용 액션 버튼 렌더링 (가로로 버튼 배치)
         let adminActionHtml = '';
-        if (isAdminLoggedIn) {
+        if (currentUserRole !== 'guest') {
           let returnBtn = item.status === '대여완료' ? `<button onclick="processReturn(${item.rowNumber}, this)" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium py-2 rounded-lg text-sm shadow-sm transition-colors">반납 확인</button>` : '';
           let deleteBtn = `<button onclick="deleteData(${item.rowNumber}, this)" class="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium py-2 rounded-lg text-sm shadow-sm transition-colors">기록 삭제</button>`;
           
