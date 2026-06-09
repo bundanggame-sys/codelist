@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>세콤 카드 대여 관리대장 (보안/인사 통합 뷰)</title>
+  <title>세콤 카드 대여 관리대장 (보안 통합 뷰)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
   <style>
@@ -251,18 +251,16 @@
   </div>
 
   <script>
-    // [가장 중요!] 구글 앱스 스크립트를 [새 버전]으로 배포한 웹앱 URL을 붙여넣으세요.
+    // [설정] 서버 통신을 위한 구글 스크립트 웹앱 주소
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzznhDOIy8Mcm-ktfOac3z_XgWsSYbp3k5ImE2hHYhQCjsI69Rx-gaTQCiRqYqnMLRI/exec'; 
 
-    // 상태 관리 변수: 이제 비밀번호 하드코딩이 없고, 권한을 3단계로 관리합니다.
     let globalRecords = [];
-    let adminRecords = []; // 하위 관리자 목록을 담을 변수
+    let adminRecords = [];
     let currentMobileFilter = '전체';
-    let currentUserRole = 'guest'; // 'guest', 'sub', 'master' 중 하나를 가집니다.
+    
+    // 현재 권한: 손님('guest'), 서브 관리자('sub'), 최고 관리자('master')
+    let currentUserRole = 'guest'; 
 
-    /**
-     * [초기화] 이 함수가 처음 켜지면 화면 크기를 판별하고 서버에서 데이터를 가져옵니다.
-     */
     window.addEventListener('DOMContentLoaded', () => {
       const isMobile = window.innerWidth < 768;
       switchViewMode(isMobile ? 'mobile' : 'pc');
@@ -271,8 +269,23 @@
     });
 
     /**
-     * [통신 모듈] 구글 서버와 문자열(텍스트)로 통신하여 CORS 에러를 회피하는 만능 팩스입니다.
+     * [마법의 안경] 전화번호 마스킹 함수 (비로그인 시 중간자리 **** 처리)
      */
+    function maskPhoneNumber(phone) {
+      if (!phone) return '';
+      // 관리자 권한(sub, master)이 있다면 번호를 마스킹 없이 그대로 반환합니다.
+      if (currentUserRole !== 'guest') return escapeHtml(phone);
+      
+      // 손님(guest)일 경우: 번호의 하이픈(-)을 우선 제거하고 형식에 맞게 마스킹합니다.
+      let cleanStr = phone.toString().replace(/-/g, '');
+      if (cleanStr.length === 11) {
+        return cleanStr.substring(0, 3) + '-****-' + cleanStr.substring(7); // 010-****-1234
+      } else if (cleanStr.length === 10) {
+        return cleanStr.substring(0, 3) + '-***-' + cleanStr.substring(6); // 옛날 번호 형식 대응
+      }
+      return escapeHtml(phone); // 알 수 없는 번호 형식일 경우 기본 반환
+    }
+
     async function sendDataToServer(payloadObj, btnElem, originalBtnText) {
       if(btnElem) { btnElem.disabled = true; btnElem.innerText = '통신 중...'; }
       try {
@@ -294,9 +307,7 @@
       }
     }
 
-    /**
-     * [로그인 프로세스] 입력된 아이디/비밀번호를 서버로 보내서 권한(Role)을 판별받습니다.
-     */
+    // 로그인 검증 통신
     async function processLogin(event) {
       event.preventDefault();
       const idInput = document.getElementById('loginId').value.trim();
@@ -304,25 +315,20 @@
       const btn = document.getElementById('loginSubmitBtn');
 
       const requestObject = { action: "login", id: idInput, pw: pwInput };
-      
-      // 서버에 로그인 검증을 요청합니다.
       const response = await sendDataToServer(requestObject, btn, '로그인');
       
       if (response && response.success) {
-        currentUserRole = response.role; // 서버가 알려준 권한('master' 또는 'sub')을 부여받습니다.
+        currentUserRole = response.role; // 'master' 또는 'sub'
         document.getElementById('loginId').value = '';
         document.getElementById('loginPw').value = '';
         toggleLoginModal(false);
-        updateAdminUI(); // 권한에 맞춰 화면의 버튼들을 새로 그립니다.
+        updateAdminUI(); 
         
-        let msg = currentUserRole === 'master' ? '최고 관리자(Master)로 로그인되었습니다. 계정 관리 기능이 활성화됩니다.' : '일반 관리자(Sub)로 로그인되었습니다. 반납/삭제 기능이 활성화됩니다.';
+        let msg = currentUserRole === 'master' ? '최고 관리자(Master)로 로그인되었습니다.\n반납, 삭제, 인사 관리 기능이 모두 활성화됩니다.' : '서브 관리자(Sub)로 로그인되었습니다.\n반납 확인 기능만 활성화되며, 삭제는 불가합니다.';
         alert(msg);
       }
     }
 
-    /**
-     * [로그아웃 프로세스] 권한을 다시 손님(guest)으로 강등시킵니다.
-     */
     function processLogout() {
       if(confirm('로그아웃 하시겠습니까?')){
         currentUserRole = 'guest';
@@ -330,9 +336,6 @@
       }
     }
 
-    /**
-     * [UI 통제 마법사] 현재 부여받은 권한(currentUserRole)에 따라 메뉴 버튼을 바꿉니다.
-     */
     function updateAdminUI() {
       const pcAuthContainer = document.getElementById('pc-auth-container');
       const mAuthContainer = document.getElementById('m-auth-container');
@@ -341,7 +344,6 @@
       let mButtons = '';
 
       if (currentUserRole === 'master') {
-        // 최고 관리자는 '계정 관리' 톱니바퀴 버튼이 추가로 보입니다!
         pcButtons = `
           <button onclick="openAdminManageModal()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm flex items-center">⚙️ 인사 관리</button>
           <button onclick="processLogout()" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔓 로그아웃</button>
@@ -351,11 +353,9 @@
           <button onclick="processLogout()" class="text-xs bg-rose-600 hover:bg-rose-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔓 아웃</button>
         `;
       } else if (currentUserRole === 'sub') {
-        // 하위 관리자는 로그아웃 버튼만 보입니다.
         pcButtons = `<button onclick="processLogout()" class="bg-rose-600 hover:bg-rose-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔓 로그아웃</button>`;
         mButtons = `<button onclick="processLogout()" class="text-xs bg-rose-600 hover:bg-rose-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔓 로그아웃</button>`;
       } else {
-        // 손님은 로그인 버튼만 보입니다.
         pcButtons = `<button onclick="toggleLoginModal(true)" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 rounded-lg text-sm font-medium text-white shadow-sm">🔐 관리자 로그인</button>`;
         mButtons = `<button onclick="toggleLoginModal(true)" class="text-xs bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1.5 rounded-md text-white font-medium shadow-sm">🔐 로그인</button>`;
       }
@@ -363,38 +363,26 @@
       pcAuthContainer.innerHTML = pcButtons;
       mAuthContainer.innerHTML = mButtons;
       
-      filterData(); // 표와 카드에 있는 반납/삭제 버튼도 권한에 맞춰 다시 그립니다.
+      // 화면 렌더링 함수를 호출하여 권한에 맞는 버튼과 마스킹된 데이터를 즉시 다시 그립니다!
+      filterData(); 
     }
 
-    /**
-     * [최고 관리자 전용] 하위 관리자 목록을 서버에서 가져옵니다.
-     */
     async function fetchAdminData() {
       const container = document.getElementById('adminListContainer');
       container.innerHTML = '<li class="text-center text-slate-400 text-sm py-4">목록을 불러오는 중...</li>';
-      
       try {
         const response = await fetch(SCRIPT_URL + '?action=getAdmins', { redirect: "follow" });
         const result = await response.json();
-        if (result.success) {
-          adminRecords = result.data;
-          renderAdminList(); // 목록 그리기
-        }
-      } catch (error) {
-        container.innerHTML = `<li class="text-center text-red-500 text-sm py-4">조회 실패</li>`;
-      }
+        if (result.success) { adminRecords = result.data; renderAdminList(); }
+      } catch (error) { container.innerHTML = `<li class="text-center text-red-500 text-sm py-4">조회 실패</li>`; }
     }
 
-    /**
-     * [최고 관리자 전용] 하위 관리자 목록을 모달창 화면에 그려줍니다.
-     */
     function renderAdminList() {
       const container = document.getElementById('adminListContainer');
       if (adminRecords.length === 0) {
         container.innerHTML = '<li class="text-center text-slate-400 text-sm py-4 bg-slate-50 rounded-lg">등록된 하위 관리자가 없습니다.</li>';
         return;
       }
-      
       let html = '';
       adminRecords.forEach(admin => {
         html += `
@@ -410,9 +398,6 @@
       container.innerHTML = html;
     }
 
-    /**
-     * [최고 관리자 전용] 하위 관리자 계정을 생성해 달라고 서버에 요청합니다.
-     */
     async function processCreateAdmin(event) {
       event.preventDefault();
       const idInput = document.getElementById('newAdminId').value.trim();
@@ -423,28 +408,18 @@
       const response = await sendDataToServer(requestObject, btn, '추가');
       
       if (response && response.success) {
-        document.getElementById('newAdminId').value = '';
-        document.getElementById('newAdminPw').value = '';
-        alert('계정이 생성되었습니다.');
-        fetchAdminData(); // 생성 후 목록 새로고침
+        document.getElementById('newAdminId').value = ''; document.getElementById('newAdminPw').value = '';
+        fetchAdminData(); 
       }
     }
 
-    /**
-     * [최고 관리자 전용] 특정 하위 관리자 계정을 지워달라고 서버에 요청합니다.
-     */
     async function processDeleteAdmin(targetId, btnElem) {
       if (!confirm(`'${targetId}' 관리자 계정을 정말 삭제하시겠습니까?`)) return;
-      
       const requestObject = { action: "deleteAdmin", targetId: targetId };
       const response = await sendDataToServer(requestObject, btnElem, '삭제중');
-      
-      if (response && response.success) {
-        fetchAdminData(); // 삭제 후 목록 새로고침
-      }
+      if (response && response.success) fetchAdminData();
     }
 
-    // 모달 제어 유틸리티
     function toggleLoginModal(show) {
       const modal = document.getElementById('loginModal');
       if (show) { modal.classList.remove('hidden'); modal.classList.add('flex'); } 
@@ -453,7 +428,7 @@
 
     function openAdminManageModal() {
       toggleAdminManageModal(true);
-      fetchAdminData(); // 창을 열 때마다 최신 인사 명부를 가져옵니다.
+      fetchAdminData(); 
     }
 
     function toggleAdminManageModal(show) {
@@ -474,9 +449,6 @@
       }
     }
 
-    /**
-     * 장부 대장을 구글 시트에서 가져옵니다. (GET 방식)
-     */
     async function fetchData() {
       document.getElementById('pc-tableBody').innerHTML = '<tr><td colspan="8" class="text-center py-12 text-slate-500">🔄 데이터를 불러오는 중...</td></tr>';
       document.getElementById('m-cardContainer').innerHTML = '<div class="text-center py-12 text-slate-500">🔄 데이터를 불러오는 중...</div>';
@@ -501,10 +473,9 @@
       }
     }
 
-    // 누구나 할 수 있는 대여 신청
+    // 누구나 가능한 대여 신청
     async function submitData(event, origin) {
       event.preventDefault();
-
       const prefix = origin === 'pc' ? 'pc-' : 'm-';
       const btn = document.getElementById(`${prefix}submitBtn`);
       
@@ -520,13 +491,13 @@
       
       if (response && response.success) {
         document.getElementById(origin === 'pc' ? 'pcForm' : 'mobileForm').reset();
-        if (origin === 'mobile') toggleMobileModal(false); // 모바일은 등록 후 창을 닫아줍니다.
-        fetchData(); // 장부를 새롭게 갱신합니다.
+        if (origin === 'mobile') toggleMobileModal(false);
+        fetchData(); 
         alert('성공적으로 대여 신청이 완료되었습니다!');
       }
     }
 
-    // 반납 처리 (sub, master 권한 모두 가능)
+    // 반납은 master, sub 모두 가능
     async function processReturn(rowNumber, btnElem) {
       if (currentUserRole === 'guest') { alert("권한이 없습니다."); return; }
       if (!confirm('카드가 정상 반납되었음을 확인하셨습니까?')) return;
@@ -536,20 +507,22 @@
       if (response && response.success) fetchData();
     }
 
-    // 기록 삭제 (sub, master 권한 모두 가능)
+    /**
+     * [이중 보안 로직] 마법의 지우개 기능은 master(최고 관리자)만 실행할 수 있습니다.
+     */
     async function deleteData(rowNumber, btnElem) {
-      if (currentUserRole === 'guest') { alert("권한이 없습니다."); return; }
+      // 프론트엔드 레벨 1차 차단
+      if (currentUserRole !== 'master') { 
+        alert("기록 삭제는 '최고 관리자(Master)' 전용 기능입니다.\n서브 관리자는 반납 처리만 가능합니다."); 
+        return; 
+      }
       if (!confirm('정말로 이 기록을 삭제하시겠습니까?\n복구할 수 없습니다!')) return;
       
       const requestObject = { action: "delete", rowNumber: rowNumber };
       const response = await sendDataToServer(requestObject, btnElem, "삭제중");
-      
-      if (response && response.success) {
-        fetchData();
-      }
+      if (response && response.success) fetchData();
     }
 
-    // 필터 데이터 매칭 함수
     function filterData() {
       const pcSearch = document.getElementById('pc-search').value.toLowerCase();
       const pcStatus = document.getElementById('pc-statusFilter').value;
@@ -589,7 +562,7 @@
     function updatePcStatusBadge(text) { document.getElementById('pc-status-badge').innerText = text; }
 
     /**
-     * [PC 뷰 렌더링] 이 함수가 호출될 때마다 권한(currentUserRole)을 검사하여 작업(Action) 버튼을 다르게 그립니다.
+     * [PC 화면 렌더링] '마법의 안경'과 '지우개 통제' 로직이 적용되었습니다.
      */
     function renderPcTable(records) {
       const tbody = document.getElementById('pc-tableBody');
@@ -602,23 +575,41 @@
         if (item.status === '대여완료') badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
         else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-200';
 
-        let actionColumnHtml = `<span class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded border border-slate-200">조회 전용</span>`;
+        // 1. 전화번호 보안 마스킹 처리 적용!
+        let maskedPhone = maskPhoneNumber(item.phone);
+
+        // 2. 권한별 작업 관리 컬럼 분기!
+        let actionColumnHtml = `<span class="text-xs text-slate-400 border border-slate-200 px-2 py-1 rounded bg-slate-50">조회 전용</span>`;
         
-        // 손님(guest)이 아닐 때, 즉 서브관리자이거나 마스터일 때 버튼 활성화
-        if (currentUserRole !== 'guest') {
+        if (currentUserRole === 'master') {
+          // 최고 관리자: 반납 도장 + 삭제 지우개 모두 쥐어줍니다.
           let buttons = '';
           if (item.status === '대여완료') {
             buttons += `<button onclick="processReturn(${item.rowNumber}, this)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm mr-2">반납 확인</button>`;
           }
           buttons += `<button onclick="deleteData(${item.rowNumber}, this)" class="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm">기록 삭제</button>`;
           actionColumnHtml = `<div class="flex justify-center items-center">${buttons}</div>`;
+        } 
+        else if (currentUserRole === 'sub') {
+          // 서브 관리자: 반납 도장만 쥐어줍니다. (삭제 지우개 없음)
+          if (item.status === '대여완료') {
+            actionColumnHtml = `<button onclick="processReturn(${item.rowNumber}, this)" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-medium px-3 py-1.5 rounded-md transition-colors whitespace-nowrap shadow-sm">반납 확인</button>`;
+          } else {
+            actionColumnHtml = `<span class="text-xs text-slate-400">처리완료</span>`;
+          }
+        } 
+        else {
+          // 손님(guest) 모드: 진행 중이면 '대여중', 아니면 '조회 전용' 표시
+          if (item.status === '대여완료') {
+            actionColumnHtml = `<span class="text-xs text-indigo-600 border border-indigo-200 px-2 py-1 rounded bg-indigo-50 font-medium">대여중</span>`;
+          }
         }
 
         html += `
           <tr class="hover:bg-slate-50 transition-colors">
             <td class="px-6 py-4 font-medium text-slate-900">${escapeHtml(item.name)}</td>
             <td class="px-6 py-4 text-slate-600">${escapeHtml(item.department)}</td>
-            <td class="px-6 py-4 text-slate-600">${escapeHtml(item.phone)}</td>
+            <td class="px-6 py-4 text-slate-600 font-mono">${maskedPhone}</td>
             <td class="px-6 py-4 font-mono font-semibold text-indigo-700">${escapeHtml(item.cardNumber)}</td>
             <td class="px-6 py-4 text-xs text-slate-500">${item.rentDate}</td>
             <td class="px-6 py-4 text-xs text-slate-500">${item.returnDate}</td>
@@ -631,7 +622,7 @@
     }
 
     /**
-     * [모바일 뷰 렌더링] 모바일에서도 동일한 권한 방어 로직이 작동합니다.
+     * [모바일 화면 렌더링] 동일한 마스킹 및 권한 분기 적용
      */
     function renderMobileCards(records) {
       const container = document.getElementById('m-cardContainer');
@@ -644,18 +635,25 @@
         if (item.status === '대여완료') badgeColor = 'bg-amber-100 text-amber-800';
         else if (item.status === '반납완료') badgeColor = 'bg-emerald-100 text-emerald-800';
         
+        let maskedPhone = maskPhoneNumber(item.phone);
+        
+        // 권한별 하단 버튼 렌더링
         let adminActionHtml = '';
-        if (currentUserRole !== 'guest') {
+        if (currentUserRole === 'master') {
           let returnBtn = item.status === '대여완료' ? `<button onclick="processReturn(${item.rowNumber}, this)" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium py-2 rounded-lg text-sm shadow-sm transition-colors">반납 확인</button>` : '';
           let deleteBtn = `<button onclick="deleteData(${item.rowNumber}, this)" class="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-medium py-2 rounded-lg text-sm shadow-sm transition-colors">기록 삭제</button>`;
-          
-          adminActionHtml = `
-            <div class="flex space-x-2 mt-3 pt-3 border-t border-slate-100">
-              ${returnBtn}
-              ${deleteBtn}
-            </div>
-          `;
+          adminActionHtml = `<div class="flex space-x-2 mt-3 pt-3 border-t border-slate-100">${returnBtn}${deleteBtn}</div>`;
+        } 
+        else if (currentUserRole === 'sub') {
+          if (item.status === '대여완료') {
+            adminActionHtml = `<div class="mt-3 pt-3 border-t border-slate-100"><button onclick="processReturn(${item.rowNumber}, this)" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium py-2.5 rounded-lg text-sm shadow-sm transition-colors">반납 확인 처리</button></div>`;
+          }
         }
+        
+        // 손님 권한일 경우 전화번호에 전화 걸기(tel:) 링크 자체를 생성하지 않도록 분기처리!
+        let phoneDisplayHtml = currentUserRole === 'guest' 
+          ? `<span class="font-mono text-slate-500">${maskedPhone}</span>` 
+          : `<a href="tel:${item.phone}" class="text-indigo-600 font-medium font-mono underline">${maskedPhone}</a>`;
         
         html += `
           <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col space-y-2.5">
@@ -668,7 +666,7 @@
             </div>
             
             <div class="text-xs space-y-1 text-slate-600">
-              <div class="flex justify-between"><span>📞 전화번호:</span><a href="tel:${item.phone}" class="text-indigo-600 font-medium underline">${escapeHtml(item.phone)}</a></div>
+              <div class="flex justify-between items-center"><span>📞 전화번호:</span>${phoneDisplayHtml}</div>
               <div class="flex justify-between"><span>💳 카드번호:</span><span class="font-mono font-semibold text-indigo-700">${escapeHtml(item.cardNumber)}</span></div>
               <div class="flex justify-between text-slate-400"><span>🛫 대여일시:</span><span>${item.rentDate}</span></div>
               <div class="flex justify-between text-slate-400"><span>🛬 반납일시:</span><span>${item.returnDate}</span></div>
